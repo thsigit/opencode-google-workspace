@@ -1,0 +1,36 @@
+{
+  "name": "opencode-google-workspace",
+  "version": "0.1.0",
+  "description": "OpenCode plugin bringing Google Workspace (Drive, Docs, Sheets, Slides, Gmail) to your agent via a local MCP server and bundled skills.",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "skills"
+  ],
+  "keywords": [
+    "opencode",
+    "plugin",
+    "skill",
+    "google",
+    "workspace",
+    "drive",
+    "docs",
+    "sheets",
+    "slides",
+    "gmail",
+    "mcp"
+  ],
+  "homepage": "https://github.com/thsigit/opencode-google-workspace",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thsigit/opencode-google-workspace.git"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
