@@ -8,13 +8,13 @@ This plugin installs a local MCP server (`gws`, using [`@dguido/google-workspace
 
 Skills cannot be distributed through the plugin API directly — OpenCode discovers skills from disk. This plugin handles both pieces:
 
-1. Registers the `gws` local MCP server in your config (via the plugin `config` hook).
+1. Registers the `gws` local MCP server through an MCP transform (V2) or the `config` hook (V1).
 2. Copies its bundled `SKILL.md` files into `~/.config/opencode/skills/` on first load (idempotent — existing skills are **never** overwritten).
 
 ## Requirements
 
-- OpenCode (Node >= 20)
-- `npx` (to run the MCP server package)
+- OpenCode **V2** (the V1 API is still supported from the same package)
+- Node >= 20 and `npx` (to run the MCP server package)
 - A Google Cloud **OAuth client** (see Setup)
 
 ## Setup
@@ -32,19 +32,18 @@ Skills cannot be distributed through the plugin API directly — OpenCode discov
    export GOOGLE_WORKSPACE_SERVICES="drive,docs,sheets,slides,gmail"
    ```
    Never commit the secret. It is only read at plugin load and injected into the MCP server config.
-3. **Add the plugin** to `~/.config/opencode/opencode.json`:
+3. **Add the plugin** to `~/.config/opencode/opencode.json` (V2 uses `plugins`; V1 used `plugin`):
    ```json
    {
-     "plugin": ["opencode-google-workspace"]
+     "plugins": ["opencode-google-workspace"]
    }
    ```
    Or install directly from GitHub:
-   ```json
-   {
-     "plugin": ["github:thsigit/opencode-google-workspace"]
-   }
+   ```sh
+   opencode plugin add github:thsigit/opencode-google-workspace
    ```
-4. **Restart OpenCode**, then make one `gws_*` tool call. A browser consent screen opens once; tokens are saved to `~/.config/google-workspace-mcp/`.
+   Local clones work too — drop the repository under `~/.config/opencode/plugins/` (or `.opencode/plugins/` in a project) with a root `index.ts`/`index.js`; OpenCode loads it automatically.
+4. **Reload**, then make one `gws_*` tool call. OpenCode watches config and plugin files, so it reloads on save; environment variable changes need `opencode service restart`. A browser consent screen opens once; tokens are saved to `~/.config/google-workspace-mcp/`.
 
 ## What you get
 
@@ -61,25 +60,24 @@ Skills cannot be distributed through the plugin API directly — OpenCode discov
 
 ## Manual fallback
 
-If you prefer not to rely on the plugin's `config` hook, add the server directly to your config and just clone/symlink the `skills/` folder:
+If you prefer not to rely on the plugin, add the server directly to your config and clone/symlink the `skills/` folder. This is the V2 shape — V1 nests servers directly under `mcp` and uses `"skills": { "paths": [...] }`:
 
 ```json
 {
   "mcp": {
-    "gws": {
-      "type": "local",
-      "command": ["npx", "-y", "@dguido/google-workspace-mcp"],
-      "environment": {
-        "GOOGLE_CLIENT_ID": "<your client id>",
-        "GOOGLE_CLIENT_SECRET": "<your client secret>",
-        "GOOGLE_WORKSPACE_SERVICES": "drive,docs,sheets,slides,gmail"
-      },
-      "enabled": true
+    "servers": {
+      "gws": {
+        "type": "local",
+        "command": ["npx", "-y", "@dguido/google-workspace-mcp"],
+        "environment": {
+          "GOOGLE_CLIENT_ID": "{env:GOOGLE_CLIENT_ID}",
+          "GOOGLE_CLIENT_SECRET": "{env:GOOGLE_CLIENT_SECRET}",
+          "GOOGLE_WORKSPACE_SERVICES": "drive,docs,sheets,slides,gmail"
+        }
+      }
     }
   },
-  "skills": {
-    "paths": ["./opencode-google-workspace/skills"]
-  }
+  "skills": ["./opencode-google-workspace/skills"]
 }
 ```
 
