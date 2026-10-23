@@ -32,6 +32,7 @@ const LINKS = {
   createProject: `${CONSOLE}/projectcreate`,
   credentials: `${CONSOLE}/apis/credentials`,
   consent: `${CONSOLE}/apis/credentials/consent`,
+  authPlatform: `${CONSOLE}/auth/overview`,
   permissions: "https://myaccount.google.com/permissions",
 }
 
@@ -50,9 +51,41 @@ function enabledServices() {
     .filter(Boolean)
 }
 
+function clientId() {
+  const fromEnv = process.env.GOOGLE_CLIENT_ID?.trim()
+  if (fromEnv) return fromEnv
+  const path = credentialsPath()
+  if (!existsSync(path)) return null
+  try {
+    const parsed = JSON.parse(readFileSync(path, "utf8"))
+    const key = ["installed", "web"].find((name) => parsed?.[name]?.client_id)
+    return key ? String(parsed[key].client_id) : null
+  } catch {
+    return null
+  }
+}
+
+/** Desktop client IDs are prefixed with the Cloud project number, e.g. 921913799255-abc... */
+function projectNumber() {
+  return clientId()?.match(/^(\d{6,})-/)?.[1] ?? null
+}
+
+function withProject(url, sep) {
+  const project = projectNumber()
+  return project ? `${url}${sep}project=${project}` : url
+}
+
 function enableApisLink() {
   const apis = enabledServices().map((service) => API_IDS[service] ?? `${service}.googleapis.com`)
-  return `${CONSOLE}/flows/enableapi?apiid=${apis.join(",")}`
+  return withProject(`${CONSOLE}/flows/enableapi?apiid=${apis.join(",")}`, "&")
+}
+
+function credentialsLink() {
+  return withProject(LINKS.credentials, "?")
+}
+
+function consentLink() {
+  return withProject(LINKS.authPlatform, "?")
 }
 
 function configDirectory() {
@@ -119,15 +152,18 @@ function stripAnsi(text) {
 
 function setupGuide() {
   const path = credentialsPath()
-  const link = enableApisLink()
   return [
     "Google Workspace needs OAuth credentials before it can authorize.",
     "",
     `1. [Create or select a Google Cloud project](${LINKS.createProject})`,
-    `2. [Enable the Workspace APIs in one click](${link})`,
-    `3. [Create an OAuth client](${LINKS.credentials}) -> Create credentials -> OAuth client ID -> Application type **Desktop app**.`,
+    `2. [Enable the Workspace APIs in one click](${enableApisLink()})`,
+    '   Wait until every API shows **Enabled** - otherwise calls fail with "API has not been used in project".',
+    `3. Configure the OAuth consent screen: [Google Auth Platform](${consentLink()})`,
+    "   - **Get started** -> app name, your email -> User type **External** (Internal only for Workspace domains).",
+    "   - **Audience -> Test users -> + Add users**: add the exact Google account you will sign in with.",
+    `4. [Create an OAuth client](${credentialsLink()}) -> Create credentials -> OAuth client ID -> Application type **Desktop app**.`,
     "   Desktop app is required; Web application clients reject the loopback redirect.",
-    "4. Give the credentials to OpenCode, either:",
+    "5. Give the credentials to OpenCode, either:",
     "",
     "   a. Export them and restart the service:",
     "      ```bash",
@@ -135,11 +171,13 @@ function setupGuide() {
     '      export GOOGLE_CLIENT_SECRET="GOCSPX-..."',
     "      opencode service restart",
     "      ```",
-    `   b. Or save the downloaded client JSON as ${path}`,
+    `   b. Or save the downloaded client JSON (for example from C:\\Users\\<you>\\Downloads) as ${path}`,
     "",
-    "5. Call google_auth again; it returns a clickable consent link.",
+    "6. Call google_auth again; it returns a clickable consent link.",
     "",
-    `Optional: check the [OAuth consent screen](${LINKS.consent}) - "Testing" apps expire refresh tokens after 7 days, so publish the app or set User Type to Internal.`,
+    'If Google answers **"<app> has not completed the Google verification process"**, click **Advanced -> Go to <app> (unsafe)**. That is the normal path for your own Testing-mode app; waiting for verification is not needed. If there is no Advanced link, your account is missing from Test users (step 3).',
+    "",
+    `Optional: [OAuth consent screen](${consentLink()}) - a "Testing" app expires refresh tokens after 7 days; publish the app or re-authorize weekly.`,
   ].join("\n")
 }
 
@@ -155,6 +193,12 @@ function successText(tokens) {
   ]
   if (tokens.created_at) lines.push(`- created: ${formatDate(tokens.created_at)}`)
   if (tokens.expiry_date) lines.push(`- access token expires: ${formatDate(tokens.expiry_date)}`)
+  if (projectNumber()) {
+    lines.push(
+      "",
+      `If a gws_* call reports "API has not been used in project", enable the APIs: ${enableApisLink()}`,
+    )
+  }
   lines.push(
     "",
     `To authorize again (for example after revoking access at ${LINKS.permissions}), call google_auth with {"force": true}.`,
@@ -178,7 +222,9 @@ function authPrompt(flow) {
   }
   lines.push(
     "",
-    "Approve access in the browser. If the browser runs on this machine the callback completes automatically; call google_auth_status to confirm.",
+    'Approve access in the browser. Expect "Google hasn\'t verified this app" -> **Advanced** -> **Go to <app> (unsafe)**; that is normal for a Testing-mode app and does not need verification.',
+    "Browser on Windows while OpenCode runs in WSL? Open the link in the Windows browser - Windows forwards 127.0.0.1 into WSL, so the loopback callback still completes. If it does not, run the CLI below inside WSL instead.",
+    "The callback completes automatically; call google_auth_status to confirm.",
     "The gws MCP server reads the token file on demand, so no MCP restart is needed. If a gws_* call still reports login required, reconnect gws in /mcps.",
     "If the redirect page cannot load (remote/headless host), re-run the flow from a terminal on the OpenCode host so you can paste the redirect URL:",
     "  npx -y @dguido/google-workspace-mcp auth",
@@ -298,7 +344,7 @@ export async function registerAuthTools(ctx) {
         if (flowIsRunning()) {
           lines.push("", `flow: running${authFlow?.url ? " - consent link issued" : " - waiting for consent link"}`)
           if (authFlow?.page) lines.push(`callback server: ${authFlow.page}`)
-        } else if (authFlow?.exitCode !== undefined) {
+        } else if (!tokens.present && authFlow?.exitCode !== undefined) {
           lines.push("", "flow: last attempt ended without saving tokens; call google_auth to retry")
         } else {
           lines.push("", "flow: not running")
@@ -320,4 +366,4 @@ export function disposeAuthFlow() {
   authFlow = null
 }
 
-export const __test = { tokenPath, credentialsPath, credentialsSource, startAuthFlow, enableApisLink, setupGuide }
+export const __test = { tokenPath, credentialsPath, credentialsSource, startAuthFlow, enableApisLink, setupGuide, clientId, projectNumber }
