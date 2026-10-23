@@ -123,20 +123,23 @@ function setupGuide() {
   return [
     "Google Workspace needs OAuth credentials before it can authorize.",
     "",
-    "1. Create or select a Google Cloud project:",
-    `   ${LINKS.createProject}`,
-    "2. Enable the Workspace APIs (one click):",
-    `   ${link}`,
-    `3. Create an OAuth client: ${LINKS.credentials} -> Create credentials -> OAuth client ID -> Application type **Desktop app**.`,
+    `1. [Create or select a Google Cloud project](${LINKS.createProject})`,
+    `2. [Enable the Workspace APIs in one click](${link})`,
+    `3. [Create an OAuth client](${LINKS.credentials}) -> Create credentials -> OAuth client ID -> Application type **Desktop app**.`,
     "   Desktop app is required; Web application clients reject the loopback redirect.",
-    "4. Give the credentials to OpenCode (either one):",
-    '   a. export GOOGLE_CLIENT_ID="....apps.googleusercontent.com"',
+    "4. Give the credentials to OpenCode, either:",
+    "",
+    "   a. Export them and restart the service:",
+    "      ```bash",
+    '      export GOOGLE_CLIENT_ID="....apps.googleusercontent.com"',
     '      export GOOGLE_CLIENT_SECRET="GOCSPX-..."',
     "      opencode service restart",
-    `   b. or save the downloaded client JSON as ${path}`,
+    "      ```",
+    `   b. Or save the downloaded client JSON as ${path}`,
+    "",
     "5. Call google_auth again; it returns a clickable consent link.",
     "",
-    `Optional: check the OAuth consent screen (${LINKS.consent}) - "Testing" apps expire refresh tokens after 7 days, so publish the app or set User Type to Internal.`,
+    `Optional: check the [OAuth consent screen](${LINKS.consent}) - "Testing" apps expire refresh tokens after 7 days, so publish the app or set User Type to Internal.`,
   ].join("\n")
 }
 
@@ -176,6 +179,7 @@ function authPrompt(flow) {
   lines.push(
     "",
     "Approve access in the browser. If the browser runs on this machine the callback completes automatically; call google_auth_status to confirm.",
+    "The gws MCP server reads the token file on demand, so no MCP restart is needed. If a gws_* call still reports login required, reconnect gws in /mcps.",
     "If the redirect page cannot load (remote/headless host), re-run the flow from a terminal on the OpenCode host so you can paste the redirect URL:",
     "  npx -y @dguido/google-workspace-mcp auth",
   )
