@@ -1,4 +1,5 @@
 import { Plugin } from "@opencode/plugin"
+import { registerAuthTools, disposeAuthFlow } from "./auth.js"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
 import { existsSync, mkdirSync, readdirSync, copyFileSync } from "node:fs"
@@ -67,7 +68,7 @@ function warnMissingCredentials() {
   const { clientId, clientSecret } = readCredentials()
   if (!clientId || !clientSecret) {
     warn(
-      "google-workspace: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set. The gws MCP server was registered but will not authenticate until you provide them (env vars or opencode.json).",
+      "google-workspace: GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set. The gws MCP server was registered but will not authenticate until you provide them (env vars or opencode.json). Call the google_auth tool for an actionable setup guide.",
     )
   }
 }
@@ -84,6 +85,8 @@ export const GoogleWorkspace = Plugin.define({
     installSkills()
     warnMissingCredentials()
 
+    await registerAuthTools(ctx)
+
     await ctx.mcp.transform((editor) => {
       if (editor.get("gws")) {
         warn("google-workspace: an existing 'gws' MCP server is configured - leaving it untouched")
@@ -91,6 +94,8 @@ export const GoogleWorkspace = Plugin.define({
       }
       editor.set("gws", mcpServer())
     })
+
+    return () => disposeAuthFlow()
   },
 })
 

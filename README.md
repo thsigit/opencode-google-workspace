@@ -43,11 +43,12 @@ Skills cannot be distributed through the plugin API directly — OpenCode discov
    opencode plugin add github:thsigit/opencode-google-workspace
    ```
    Local clones work too — drop the repository under `~/.config/opencode/plugins/` (or `.opencode/plugins/` in a project) with a root `index.ts`/`index.js`; OpenCode loads it automatically.
-4. **Reload**, then make one `gws_*` tool call. OpenCode watches config and plugin files, so it reloads on save; environment variable changes need `opencode service restart`. A browser consent screen opens once; tokens are saved to `~/.config/google-workspace-mcp/`.
+4. **Reload**, then call the `google_auth` tool. OpenCode watches config and plugin files, so it reloads on save; environment variable changes need `opencode service restart`. `google_auth` returns a clickable consent link, or a setup guide when credentials are missing. Tokens are saved to `~/.config/google-workspace-mcp/`.
 
 ## What you get
 
 - **MCP server `gws`** — 70+ tools across Drive, Docs, Sheets, Slides, and Gmail, exposed as `gws_*` in OpenCode.
+- **Auth tools** — `google_auth` returns a clickable consent link or an actionable setup guide; `google_auth_status` reports credential, token and flow state (V2).
 - **Skills** (see `skills/`):
   | Skill | Purpose |
   | --- | --- |
@@ -57,6 +58,24 @@ Skills cannot be distributed through the plugin API directly — OpenCode discov
   | `google-slides` | Create, read, edit (text boxes, shapes, backgrounds, speaker notes) decks |
   | `gmail` | Search, read, draft, send, label, filter mail |
   | `gmail-inbox-triage` | Triage inbox into urgent / reply-soon / waiting / FYI |
+
+## Authenticate
+
+Call `google_auth` from the agent — it is actionable by design:
+
+- **No credentials yet** → returns a step-by-step guide with clickable links: create a project, enable the APIs in one click, create a Desktop OAuth client, and both ways to hand the credentials to OpenCode.
+- **Credentials present** → starts the MCP server's auth flow, captures the consent URL from its output, and returns it as a clickable `Authorize with Google` link plus the loopback fallback page. The flow stays alive for about five minutes.
+- **Already authorized** → reports the token file, refresh-token state and expiry. Pass `{"force": true}` to authorize again.
+
+`google_auth_status` reports the same state without starting a flow.
+
+The OAuth callback is a loopback server on the OpenCode host (`127.0.0.1`). When the browser runs on that machine, approving is enough. On a remote or headless host the redirect page will not load; run the flow in a terminal there instead so you can paste the redirect URL at its prompt:
+
+```bash
+npx -y @dguido/google-workspace-mcp auth
+```
+
+Tokens are stored in `~/.config/google-workspace-mcp/tokens.json`, or `$GOOGLE_WORKSPACE_MCP_TOKEN_PATH` when set, or under `profiles/<name>/` when `GOOGLE_WORKSPACE_MCP_PROFILE` is used.
 
 ## Manual fallback
 
