@@ -299,7 +299,7 @@ export async function registerAuthTools(ctx) {
           lines.push("", `flow: running${authFlow?.url ? " - consent link issued" : " - waiting for consent link"}`)
           if (authFlow?.page) lines.push(`callback server: ${authFlow.page}`)
         } else if (authFlow?.exitCode !== undefined) {
-          lines.push("", `flow: finished (exit ${authFlow.exitCode})`)
+          lines.push("", "flow: last attempt ended without saving tokens; call google_auth to retry")
         } else {
           lines.push("", "flow: not running")
         }
